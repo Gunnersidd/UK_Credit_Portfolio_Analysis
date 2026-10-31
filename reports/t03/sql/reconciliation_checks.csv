@@ -1,0 +1,9 @@
+check_name,failure_count
+required_fields_null,0
+balance_equation_mismatch,0
+invalid_dpd_bucket,0
+account_month_continuity_or_lifecycle,0
+originations_not_zero_opening,0
+monthly_control_reconciliation,0
+control_month_missing_from_fact,0
+roll_rate_destinations_sum_to_denominator,0

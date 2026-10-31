@@ -1,0 +1,10 @@
+# Keep LaTeX sources and final PDFs; omit compiler intermediates and logs.
+/build/
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.xdv

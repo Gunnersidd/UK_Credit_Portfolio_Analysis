@@ -1,0 +1,105 @@
+\documentclass[11pt]{article}
+\input{common.tex}
+\title{Source Code Documentation\\[4pt]\large UK Credit Portfolio Performance and Stress Analysis}
+\author{Project technical documentation}
+\date{31 October 2026}
+\hypersetup{pdftitle={Source Code Documentation - UK Credit Portfolio Project}}
+
+\begin{document}
+\maketitle
+\syntheticnotice
+\tableofcontents
+\newpage
+
+\section{Purpose and repository map}
+
+This guide describes the source files that generate and validate the project outputs. The project follows small task stages: define the data contract, generate and validate a synthetic portfolio, calculate review metrics, add sourced UK context, create reporting artifacts, audit assisted commentary, and run a final evidence review.
+
+\begin{longtable}{p{0.25\linewidth}p{0.68\linewidth}}
+\toprule
+\textbf{Path} & \textbf{Role} \\
+\midrule
+\endhead
+\filepath{data_specification.md}, \filepath{data_dictionary.md} & Grain, keys, meanings, denominators, date rules, edge cases, and limitations. \\
+\filepath{generation_rules.md} & Fixed seed and all synthetic generation assumptions. \\
+\filepath{scripts/generate_portfolio.py} & Creates the account-month CSV with standard-library Python. \\
+\filepath{scripts/validate_portfolio.py} & Checks schema, key, range, state, lifecycle, arithmetic, and monthly totals. \\
+\filepath{sql/} & SQLite schema and monthly, risk-segment, vintage, delinquency, roll-rate, and reconciliation queries. \\
+\filepath{scripts/run_sql_analysis.py} & Loads controlled data into SQLite, runs checks, and exports query results. \\
+\filepath{scripts/build_review_workbook.py} & Writes the eight-sheet Excel review workbook from SQL exports. \\
+\filepath{scripts/validate_review_workbook.py} & Checks workbook structure, source row counts, formulas, and cached ratios against SQL. \\
+\filepath{scripts/build_scenarios.py} & Joins month-end Bank of England context and computes illustrative scenarios. \\
+\filepath{scripts/validate_scenarios.py} & Checks exact date coverage, joins, assumptions, scenario calculations, and sensitivity rows. \\
+\filepath{scripts/build_t05_reporting.py} & Embeds validated T03/T04 exports into the self-contained HTML dashboard preview. \\
+\filepath{scripts/validate_t05_reporting.py}, \filepath{scripts/validate_t05_dashboard.js} & Check report lineage, KPI values, source coverage, and dashboard rendering/selection behavior. \\
+\filepath{scripts/build_t06_commentary_inputs.py} & Produces 28 pre-calculated values, definitions, and source paths for the commentary audit. \\
+\filepath{scripts/validate_t06_commentary.py} & Checks metric levels and movements against T03/T04, plus prompt, audit, and approved text controls. \\
+\filepath{scripts/validate_t07_final.py} & Runs final stage validators and checks deliverable/evidence status. \\
+\bottomrule
+\end{longtable}
+
+\section{Data and analytical source flow}
+
+The primary dataset is \texttt{data/synthetic\_portfolio.csv}, with one account per month-end observation. It contains 55,145 rows for 2,000 generated accounts across 57 month ends, January 2022 through September 2026. Monetary source fields are generated to integer pence and serialized in GBP. The accepted file hash is \texttt{04dce168244871a60a66c62b9f538f86050d0e224b5bb7f9b62c8e6ae10f896e}.
+
+\begin{enumerate}
+\item \texttt{generate\_portfolio.py} applies the documented fixed seed and writes the synthetic snapshots.
+\item \texttt{validate\_portfolio.py} compares the source rows with required lifecycle and arithmetic rules and writes monthly control totals.
+\item \texttt{run\_sql\_analysis.py} loads the source/control totals, materializes \texttt{data/portfolio.sqlite}, runs eight reconciliations, and exports five analytical cuts.
+\item \texttt{build\_review\_workbook.py} uses those SQL outputs and the fact file to create the review workbook. The workbook validator checks cached formula results against SQL.
+\item \texttt{build\_scenarios.py} exact-joins the three official Bank of England series to the portfolio by month-end, then calculates the explicit T04 sensitivities.
+\item T05 embeds the accepted outputs for reporting. T06 assembles pre-calculated metrics, preserves its prompt and raw draft, and retains the human audit and approved commentary.
+\end{enumerate}
+
+\section{SQL files and table grain}
+
+\begin{itemize}
+\item \texttt{schema.sql}: fact and monthly-control table definitions; financial values are integer pence in SQLite.
+\item \texttt{monthly\_portfolio.sql}: monthly stocks, flows, rate numerators/denominators, utilisation, and simulated 30+ proxy rates.
+\item \texttt{risk\_segment.sql}: monthly cuts by synthetic segment.
+\item \texttt{vintage\_mob.sql}: origination cohort and months-on-book cuts, with observed and active populations distinguished.
+\item \texttt{delinquency\_state.sql}: account and balance distribution across generated state buckets.
+\item \texttt{roll\_rates.sql}: consecutive-month account transitions, including a separate CLOSED destination.
+\item \texttt{reconciliation\_checks.sql}: data and aggregate consistency checks.
+\end{itemize}
+
+The T01 metric contract defines portfolio utilisation as summed active balance divided by summed active limit. Payment rate is active payment receipts divided by active amount due; final close-month receipts are reported separately. The generated delinquency state and representative DPD days are proxies because the generator has no dated bill or arrears ledger. Closing balance is not EAD or expected loss.
+
+\section{Scenario implementation}
+
+\texttt{data/boe\_context\_monthly.csv} contains Bank Rate (\texttt{IUMBEDR}), a representative quoted card lending rate (\texttt{IUMCCTL}), and an effective rate for interest-charging card balances (\texttt{CFMZ6IR}). Metadata, coverage, URLs, release timing, and access date are in \texttt{data/boe\_source\_register.csv}. The portfolio and external rates are separate populations.
+
+The T04 scenario engine applies effective card-rate assumptions to the September 2026 synthetic closing balance, held constant for 12 months. All balance is assumed interest-bearing and immediately repriced. Bank Rate changes and card-rate shocks are independent; there is no estimated pass-through. Results are annualized mechanical cost proxies, not forecasts, customer costs, portfolio income, or loss projections.
+
+\section{Reproduction commands}
+
+Run from the repository root. The first group recreates the analysis. The final validator reruns the stage checks and records the outstanding native Power BI handoff.
+
+\begin{lstlisting}
+python3 scripts/generate_portfolio.py
+python3 scripts/validate_portfolio.py
+python3 scripts/run_sql_analysis.py
+python3 scripts/build_review_workbook.py
+python3 scripts/validate_review_workbook.py
+python3 scripts/build_scenarios.py
+python3 scripts/validate_scenarios.py
+python3 scripts/build_t05_reporting.py
+python3 scripts/validate_t05_reporting.py
+python3 scripts/build_t06_commentary_inputs.py
+python3 scripts/validate_t06_commentary.py
+python3 scripts/validate_t07_final.py
+\end{lstlisting}
+
+The generator horizon is frozen through September 2026. The saved Bank of England series are inputs to the reproducible analysis; updating them requires a new official-source review and updated metadata.
+
+\section{Power BI implementation package}
+
+The T05 folder contains a browser dashboard preview, Power BI import instructions, model relationships, and DAX measures. The summary model should use the controlled T03/T04 CSV outputs, not the full source snapshot file. The environment used for this build had no Power BI Desktop or PBIX authoring tool. No native PBIX or render test exists. A detailed, current step-by-step handoff is in \texttt{latex/src/powerbi\_implementation\_guide.tex} and its compiled PDF.
+
+\section{Quality records and supported claims}
+
+Task status is in \filepath{execution.md}; findings and dispositions are in \filepath{critic.md} and \filepath{update_log.md}. Detailed evidence includes T02 data validation, T03 SQL/workbook reconciliation, T04 scenario checks, T05 reporting checks, T06 commentary audit, and T07 final review.
+
+Resume claims are explicitly deferred until overall project acceptance. A native Power BI report remains an open material deliverable; the current dashboard must be described as an interactive HTML preview plus a Power BI-ready package.
+
+\end{document}

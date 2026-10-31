@@ -1,0 +1,186 @@
+\documentclass[11pt]{article}
+\input{common.tex}
+\title{Power BI Implementation Guide\\[4pt]\large From the Validated T05 Package to a Native Report}
+\author{Power BI handoff documentation}
+\date{31 October 2026}
+\hypersetup{pdftitle={Power BI Implementation Guide - UK Credit Portfolio}}
+
+\begin{document}
+\maketitle
+\syntheticnotice
+\begin{abstract}
+This guide explains how to create and validate the native Power BI report that remains outstanding in T05. It uses the existing monthly SQL exports, Bank of England context and scenario CSVs, prepared DAX measures, and source-to-output map. The finished report must continue to label the portfolio as synthetic and the generated delinquency measures as proxies.
+\end{abstract}
+\tableofcontents
+\newpage
+
+\section{What is prepared and what remains}
+
+The repository contains a tested interactive HTML dashboard preview, validated T03/T04 CSV exports, a DAX measure pack, a proposed table model, and page specifications. It does not contain a native \texttt{.pbix} or an exported Power BI render. The remaining work requires Power BI Desktop to import the package, build report pages, save the native report, and compare its values and labels with the source map.
+
+\begin{longtable}{p{0.33\linewidth}p{0.60\linewidth}}
+\toprule
+\textbf{Prepared artifact} & \textbf{Purpose} \\
+\midrule
+\endhead
+\filepath{reports/t03/sql/monthly_portfolio.csv} & Monthly active stocks, flows, ratio numerators/denominators, and pre-calculated SQL rates. \\
+\filepath{reports/t03/sql/risk_segment.csv} & Monthly account/balance/rate measures by generated segment. \\
+\filepath{reports/t03/sql/vintage_mob.csv} & Cohort/MOB performance with observed and active counts. \\
+\filepath{reports/t03/sql/delinquency_state.csv} & Account/balance proxy-state mix. \\
+\filepath{reports/t03/sql/roll_rates.csv} & Opening/destination state transition counts, denominators, and rates. \\
+\filepath{reports/t04/portfolio_context_joined.csv} & Exact-month synthetic portfolio and external Bank of England context. \\
+\filepath{reports/t04/scenario_results.csv} & Three fixed September 2026 illustrative scenarios. \\
+\filepath{reports/t04/scenario_sensitivity.csv} & Twenty-one balance/rate sensitivity combinations. \\
+\filepath{reports/t05/powerbi/measures.dax} & DAX measures that preserve numerator/denominator weighting and money units. \\
+\filepath{reports/t05/source_to_output_map.md} & KPI lineage, definitions, September control values, and interpretation caveats. \\
+\bottomrule
+\end{longtable}
+
+Do not load the 55,145-row raw account-month file for this summary report. It is not required for these pages. Load it only for a specifically scoped account-level drill-through, with the synthetic-data label and metric definitions preserved.
+
+\section{Create the report and import the tables}
+
+\begin{enumerate}
+\item Open Power BI Desktop and choose a blank report. Save an initial \texttt{.pbix} in a new working location before building visuals.
+\item For each table in the artifact list, use \textbf{Get Data} and select \textbf{Text/CSV}. Navigate to the repository export and choose \textbf{Transform Data}. Microsoft's Text/CSV connector documentation describes this Desktop import route and the Transform Data/Load choices.\footnote{Microsoft Learn, \href{https://learn.microsoft.com/en-us/power-query/connectors/text-csv}{Power Query Text/CSV connector}, accessed 31 October 2026.}
+\item In Power Query, confirm headers and inspect the first and last rows. Set all month fields to \textbf{Date}; set T03 monetary columns ending in \texttt{\_pence} to \textbf{Whole Number}; set T04 scenario/cost fields to \textbf{Decimal Number}. Segment and state labels remain text. Do not let automatic type inference convert identifiers into numeric values.
+\item Rename each imported query to its model table name as listed in \filepath{reports/t05/powerbi/README.md}. Keep the original CSV filename in the query description or notes.
+\item Select \textbf{Close \& Apply}. Confirm that row counts match T03/T04 validation: 57 monthly rows; 171 segment rows; 1,653 vintage/MOB rows; 241 state rows; 661 roll rows; 57 context rows; 3 scenario rows; and 21 sensitivity rows.
+\end{enumerate}
+
+The files use UTF-8 CSV. T03 money is integer pence; T04 scenario values are already GBP. Never divide T04 cost fields by 100. If an import or refresh adds/removes columns, inspect the Power Query source step and refresh preview: Microsoft's connector documentation notes that the CSV import step can retain the original column count.\footnote{Microsoft Learn, \href{https://learn.microsoft.com/en-us/power-query/connectors/text-csv}{Power Query Text/CSV connector}, accessed 31 October 2026.}
+
+\section{Build the date and model relationships}
+
+Create a contiguous daily calendar that spans complete years for this historical report, then relate its unique \texttt{Date} column to the monthly snapshot facts. A date table should have unique, nonblank, contiguous dates; Microsoft documents these requirements and the date-table marking behavior.\footnote{Microsoft Learn, \href{https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-date-tables}{Set and use date tables in Power BI Desktop}, accessed 31 October 2026.}
+
+\begin{lstlisting}
+Calendar =
+ADDCOLUMNS (
+    CALENDAR ( DATE ( 2022, 1, 1 ), DATE ( 2026, 12, 31 ) ),
+    "Year", YEAR ( [Date] ),
+    "MonthNumber", MONTH ( [Date] ),
+    "MonthStart", DATE ( YEAR ( [Date] ), MONTH ( [Date] ), 1 ),
+    "MonthEnd", EOMONTH ( [Date], 0 ),
+    "YearMonth", FORMAT ( [Date], "yyyy-MM" ),
+    "MonthSort", YEAR ( [Date] ) * 100 + MONTH ( [Date] )
+)
+\end{lstlisting}
+
+Set \texttt{Calendar[Date]} to Date type, sort \texttt{Calendar[YearMonth]} by \texttt{Calendar[MonthSort]}, and mark Calendar as the date table if using classic time-intelligence functions. The snapshot CSV has only month-end observations; a monthly axis built from \texttt{YearMonth} filters the date table down to the observed month-end fact row.
+
+In Model view or Manage relationships, create these active one-to-many, single-direction relationships from the calendar's unique date to each many-side month field:
+
+\begin{itemize}
+\item \texttt{Calendar[Date]} $1\rightarrow *$ \texttt{Monthly[snapshot\_month]}
+\item \texttt{Calendar[Date]} $1\rightarrow *$ \texttt{RiskSegment[snapshot\_month]}
+\item \texttt{Calendar[Date]} $1\rightarrow *$ \texttt{DelinquencyState[snapshot\_month]}
+\item \texttt{Calendar[Date]} $1\rightarrow *$ \texttt{Context[month\_end]}
+\item \texttt{Calendar[Date]} $1\rightarrow *$ \texttt{RollRates[opening\_month]}
+\end{itemize}
+
+Use single-direction filters from the calendar. Microsoft explains relationship cardinality and filter propagation in its model guidance; avoid bi-directional relationships unless a demonstrated requirement needs them.\footnote{Microsoft Learn, \href{https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand}{Model relationships in Power BI Desktop}, accessed 31 October 2026.}
+
+Keep the cohort and scenario tables from being filtered by the snapshot calendar:
+
+\begin{itemize}
+\item Add a separate \texttt{OriginationMonth} table if cohort filtering is needed. Relate its unique month-end date to \texttt{VintageMOB[origination\_month]}. Do not connect this same column as a second active role of the snapshot calendar.
+\item Leave \texttt{Scenarios} and \texttt{Sensitivity} disconnected from the snapshot calendar. Their September 2026 anchor is fixed, not controlled by the review-month slicer.
+\end{itemize}
+
+Power BI propagates filters over model relationships. The scenario tables are deliberately disconnected so the selected review month cannot silently change their fixed anchor assumptions.\footnote{Microsoft Learn, \href{https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand}{Model relationships in Power BI Desktop}, accessed 31 October 2026.}
+
+\section{Add the DAX measures}
+
+Open \texttt{reports/t05/powerbi/measures.dax}. Create the listed measures in the \texttt{Monthly}, \texttt{Context}, and \texttt{Scenarios} tables (or place them in a dedicated Measures table). Format currencies in GBP and rates as percentages. T03 monetary columns are pence, so the DAX divides them by 100. Context rates are stored as percent points such as 21.71 and are divided by 100 for percentage formatting. Scenario costs are already in GBP.
+
+The core measures use summed numerators and denominators:
+
+\begin{lstlisting}
+Active Balance GBP = DIVIDE ( SUM ( Monthly[active_balance_pence] ), 100 )
+
+Active Accounts = SUM ( Monthly[active_accounts] )
+
+Utilisation = DIVIDE (
+    SUM ( Monthly[active_balance_pence] ),
+    SUM ( Monthly[active_limit_pence] )
+)
+
+Payment Rate = DIVIDE (
+    SUM ( Monthly[active_payment_received_pence] ),
+    SUM ( Monthly[active_payment_due_pence] )
+)
+
+Simulated 30+ Account Proxy Rate = DIVIDE (
+    SUM ( Monthly[simulated_30plus_accounts] ),
+    SUM ( Monthly[active_accounts] )
+)
+
+Simulated 30+ Balance Proxy Rate = DIVIDE (
+    SUM ( Monthly[simulated_30plus_balance_pence] ),
+    SUM ( Monthly[active_balance_pence] )
+)
+\end{lstlisting}
+
+For monthly trend visuals, use these weighted ratio measures. Do not average a pre-calculated monthly ratio over multiple months. Show the simulated/proxy qualifier in visual titles and tooltips.
+
+\section{Build report pages}
+
+Use a consistent title strip with “Synthetic UK Credit Portfolio” and the selected review month. Add a small persistent note: “Generated portfolio; delinquency states are proxies, not contractual arrears.” A suggested five-page report is:
+
+\begin{enumerate}
+\item \textbf{Portfolio Overview}: month selector using \texttt{Calendar[YearMonth]}; cards for active balance, accounts, utilisation, payment rate, simulated 30+ account proxy rate, and simulated 30+ balance proxy rate; a 12-month balance/limit line chart; a 12-month 30+ proxy rate chart; and selected-month status mix. Use separate rate measures rather than averaging stored monthly rates.
+\item \textbf{Segment and Vintage}: segment balance and proxy-rate trend with segment names visibly labeled “generator-defined”; vintage/MOB line charts with eligible/observed account counts. Show inactive or unobserved cohorts as missing, not as zero performance.
+\item \textbf{State Transitions}: matrix with opening state as rows and destination state as columns; include transition count and roll rate. Include the opening-state denominator and CLOSED destination; low denominators should remain visible.
+\item \textbf{UK Context and Scenarios}: a market-context trend alongside synthetic portfolio indicators, with the external-population caveat. Show Baseline, Moderate, and Severe annualized proxy values and a sensitivity view. Keep scenario table disconnected from the month selector and repeat its static-balance assumptions in the subtitle.
+\item \textbf{Reconciliation}: a reviewer page with a September 2026 fixed snapshot table, a fixed scenario table, and denominator/numerator fields. Use the controls below before publishing or sharing the report.
+\end{enumerate}
+
+Use restrained color: blue/teal for portfolio measures; amber/red for generated proxy status indicators; neutral gray for UK context. Avoid red/green status semantics that imply operational credit decisions.
+
+\section{Reconcile and save the native report}
+
+Set the month to September 2026 and verify the visible control values against \filepath{reports/t05/source_to_output_map.md} and the relevant source CSVs:
+
+\begin{longtable}{p{0.52\linewidth}p{0.36\linewidth}}
+\toprule
+\textbf{Control} & \textbf{Expected display} \\
+\midrule
+\endhead
+Active accounts & 1,833 \\
+Active closing balance & £2,493,132.48 \\
+Active credit limits & £8,231,450.00 \\
+Utilisation & 30.29\% \\
+Simulated 30+ account proxy rate & 2.56\% \\
+Simulated 30+ balance proxy rate & 2.60\% \\
+Payment rate & 91.35\% \\
+Bank Rate / quoted card / effective card context & 3.75\% / 24.71\% / 21.71\% \\
+Baseline / Moderate / Severe annualized proxy & £541,259.06 / £578,656.05 / £616,053.04 \\
+\bottomrule
+\end{longtable}
+
+Then check August 2026 and confirm the month selector updates snapshot metrics and context but leaves the September-anchored scenarios fixed. Confirm 30+ proxy count is 47 and agrees with the 30--59, 60--89, and 90+ generated buckets. Check one segment row and one roll-rate denominator against SQL outputs. Save the file as \texttt{UK\_Credit\_Portfolio\_Review.pbix}; capture a PDF export or screenshots for review evidence. Update the README and T07 final review with the actual Desktop version, file path, render evidence, and any fixes. Do not mark overall acceptance until the native report passes these checks.
+
+\section{Known interpretation limits}
+
+\begin{itemize}
+\item The whole account portfolio is synthetic; its size, segment mix, transitions, payments, and closures are assumed.
+\item Generated DPD/status measures are not ledger-based arrears, default, or NPL.
+\item Closing balance is not EAD or expected loss; segment labels are not real score bands.
+\item Bank of England context series represent external market populations, not this synthetic book.
+\item Scenarios are static-balance sensitivities, not fitted pass-through, forecasts, income estimates, customer costs, or loss projections.
+\item Until Desktop import and render are done, the HTML file is only a preview and the Power BI package is a handoff, not a completed native report.
+\end{itemize}
+
+\section{Microsoft documentation checked}
+
+The steps above were checked against Microsoft Learn on 31 October 2026:
+
+\begin{itemize}
+\item Text/CSV import: \href{https://learn.microsoft.com/en-us/power-query/connectors/text-csv}{Power Query Text/CSV connector}.
+\item Relationship creation and editing: \href{https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-create-and-manage-relationships}{Create and manage relationships in Power BI Desktop}.
+\item Relationship semantics and filter direction: \href{https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand}{Model relationships in Power BI Desktop}.
+\item Date table criteria and marking: \href{https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-date-tables}{Set and use date tables in Power BI Desktop}.
+\end{itemize}
+
+\end{document}

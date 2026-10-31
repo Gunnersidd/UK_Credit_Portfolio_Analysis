@@ -1,0 +1,28 @@
+\usepackage[margin=0.82in,headheight=15pt]{geometry}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{listings}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+\definecolor{navy}{HTML}{18324B}
+\definecolor{teal}{HTML}{087E83}
+\definecolor{muted}{HTML}{5E7182}
+\definecolor{pale}{HTML}{EEF4F5}
+\definecolor{codebg}{HTML}{F3F6F8}
+\hypersetup{colorlinks=true,linkcolor=teal,urlcolor=teal,citecolor=navy,pdftitle={UK Credit Portfolio Project},pdfauthor={Project documentation}}
+\newcommand{\filepath}[1]{\path{#1}}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\color{muted}UK Credit Portfolio Project}
+\rhead{\small\color{muted}\leftmark}
+\cfoot{\small\color{muted}\thepage}
+\setlength{\headsep}{18pt}
+\lstset{basicstyle=\ttfamily\small,backgroundcolor=\color{codebg},frame=single,rulecolor=\color{pale},breaklines=true,columns=fullflexible,showstringspaces=false,upquote=true}
+\newcommand{\syntheticnotice}{\par\medskip\noindent\colorbox{pale}{\parbox{0.96\linewidth}{\textbf{Scope:} This project uses a synthetic portfolio. No customer, account, or lender is real. Results are illustrative and do not establish actual performance, arrears, losses, causality, or credit policy effectiveness.}}\par\medskip}

@@ -1,0 +1,46 @@
+# Internal task planning and validation workflow
+/plan.md
+/method.md
+/checks.md
+/execution.md
+/critic.md
+/update_log.md
+/validation_design.md
+/reports/t02_validation.md
+/reports/t03_validation.md
+/reports/t04_validation.md
+/reports/t05/critic_record.md
+/reports/t05/validation.md
+/reports/t06/
+/reports/t07/validation.md
+/reports/t07/final_review.md
+/reports/t07/resume_evidence.md
+
+# Local agent state, credentials, and generated files
+/.codex/
+/.agents/
+/.claude/
+/AGENTS.md
+/AGENTS.override.md
+/CODEX.md
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.swp
+*.swo
+*~
+.DS_Store
+**/.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Keep README files; exclude all other Markdown
+*.md
+!README.md

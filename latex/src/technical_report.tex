@@ -1,0 +1,132 @@
+\documentclass[11pt]{article}
+\input{common.tex}
+\title{Technical Project Report\\[4pt]\large UK Credit Portfolio Performance and Stress Analysis}
+\author{Project technical report}
+\date{31 October 2026}
+\hypersetup{pdftitle={Technical Project Report - UK Credit Portfolio}}
+
+\begin{document}
+\maketitle
+\syntheticnotice
+\begin{abstract}
+This report documents an end-to-end portfolio-monitoring exercise built from a reproducible synthetic UK credit-card portfolio. It covers data design and generation, validation, SQL and Excel analysis, official Bank of England context, illustrative rate sensitivities, reporting, and an audit of AI-assisted commentary. The report separates synthetic portfolio behavior from external market series and documents the one outstanding deliverable: a native Power BI report has not yet been authored or rendered.
+\end{abstract}
+\tableofcontents
+\newpage
+
+\section{Project objective and boundaries}
+
+The objective was to build a small, reviewable monthly portfolio analysis that demonstrates a credit analyst workflow: define measures, create data-quality controls, produce repeatable analysis, communicate movements, and preserve evidence. The project data are wholly synthetic. No real account, customer, transaction, or lender data were used. The analysis is a learning artifact, not an estimate of UK card performance, a credit decision system, or proof of a loss outcome.
+
+The use of a generated portfolio was explicit in the project scope. External economic context was added separately from the account data to frame an illustrative sensitivity exercise. Contextual co-movement is not treated as causal evidence.
+
+\section{Dataset and measurement contract}
+
+The accepted fact table has one row per synthetic account per observed month-end. It contains 55,145 account-month rows for 2,000 accounts from 31 January 2022 to 30 September 2026, for 57 monthly periods. The data generator uses seed \texttt{20261030}, Python's standard library, and integer-pence monetary arithmetic. The CSV SHA-256 is recorded in \texttt{reports/t02\_validation.md}; the final rebuild reproduced that exact hash.
+
+The dataset includes account and origination month, account status, generated risk segment, acquisition channel, age band, credit limit, balance and monthly payment fields, representative DPD, and generated delinquency status. The fields contain no personal identifiers. Segment mix and account behavior are generator assumptions, not sampled estimates.
+
+\subsection{Core measures}
+
+\begin{itemize}
+\item \textbf{Active balance:} sum of closing balance for active accounts at month-end. This is a balance proxy, not EAD or expected loss.
+\item \textbf{Utilisation:} active closing balance divided by active limits. The portfolio measure is limit-weighted.
+\item \textbf{Payment rate:} active payment received divided by active payment due. Final closed-account receipts are shown separately.
+\item \textbf{Simulated 30+ account proxy rate:} accounts in generated 30+ state buckets divided by active accounts.
+\item \textbf{Simulated 30+ balance proxy rate:} balance in generated 30+ state buckets divided by total active balance.
+\item \textbf{Vintage/MOB:} cohort based on origination month; MOB 0 is the origination month. Observed and active populations are identified.
+\item \textbf{Roll rate:} account-count transitions from one monthly generated state to the next, with closure represented as a destination.
+\end{itemize}
+
+Generated delinquency states use representative DPD values without invoice due dates or a dated arrears ledger. They are not actual delinquency, contractual arrears, default, or NPL measures. The generator samples payment receipt conditional on generated state; this does not support causal conclusions about payment behavior.
+
+\section{Generation and data validation}
+
+Accounts enter in staggered monthly cohorts. Segment, channel, and age-band quotas, limits, transaction distributions, synthetic state transitions, payment rules, and closures are written in \filepath{generation_rules.md}. The generation window is frozen rather than automatically extended. Closures produce a final zero-balance row, with the receipt that clears the balance reported separately in monthly flow outputs.
+
+The T02 validator checks required fields, key uniqueness, month coverage, category and limit constraints, balance arithmetic, state mappings and transitions, account history continuity, terminal closures, and account-level monthly aggregates. The final run passed with 55,145 rows, 2,000 accounts, 57 months, and 167 closed accounts. The monthly control totals are derived checks, not an independent source dataset.
+
+\section{SQL and Excel analysis}
+
+The SQL pipeline reloads the fact file and control totals into SQLite, runs eight reconciliation checks, and exports five cuts: 57 monthly rows, 171 risk-segment rows, 1,653 vintage/MOB rows, 241 delinquency-state rows, and 661 roll-rate rows. The eight checks returned zero failures. Money in SQLite is stored as integer pence.
+
+The eight-sheet Excel workbook includes metric notes, a start page, monthly portfolio, risk segment, vintage/MOB, delinquency state, roll rates, and the 55,145-row account-month table. Summary sheets expose numerators and denominators; cached formula ratios were checked against the SQL rates. The final workbook validator passed structure, row-count, formula, and ratio checks.
+
+\section{Bank of England context}
+
+Three monthly Bank of England series are retained in the data folder and described in the source register:
+
+\begin{itemize}
+\item \texttt{IUMBEDR}: end-month official Bank Rate;
+\item \texttt{IUMCCTL}: representative quoted credit-card lending rate to households;
+\item \texttt{CFMZ6IR}: effective rate on interest-charging credit-card balances.
+\end{itemize}
+
+The series were checked on 30 October 2026 and aligned to portfolio month-end. At September 2026, recorded values are 3.75\% Bank Rate, 24.71\% quoted card rate, and 21.71\% effective card rate. The Bank Rate extract ended at August 2026; September is set to 3.75\% based on the official 17 September 2026 MPC decision holding the rate unchanged. The source register documents this exception and all official URLs. The three series represent external UK lender/customer populations, not the synthetic accounts.
+
+\section{Illustrative rate sensitivities}
+
+The T04 scenarios apply the September effective card rate to the September synthetic active balance of £2,493,132.48, keep that balance constant for 12 months, and assume the entire balance is interest-bearing and reprices immediately. Bank Rate and effective card-rate shocks are independent assumptions; no pass-through was estimated.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Scenario & Assumed card rate & Annualized proxy & Change vs baseline \\
+\midrule
+Baseline & 21.71\% & £541,259.06 & £0.00 \\
+Moderate & 23.21\% & £578,656.05 & £37,396.99 \\
+Severe & 24.71\% & £616,053.04 & £74,793.97 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+These are mechanical annualized sensitivities, not forecasts, realized income, customer interest costs, delinquency projections, or loss estimates. The project includes 21 balance/rate sensitivity combinations for review.
+
+\section{September 2026 portfolio review}
+
+The synthetic portfolio closed September with £2,493,132.48 of active balance across 1,833 active accounts. Utilisation was 30.29\%. Month over month, balance increased by £50,441.48 and utilisation increased by 0.15 percentage points. Payment rate was 91.35\% in September versus 91.18\% in August.
+
+The simulated 30+ account proxy rate moved from 2.60\% to 2.56\%, while the simulated 30+ balance proxy rate moved from 2.45\% to 2.60\%. Proxy-state account count remained 47. Proxy balance increased from £59,794.19 to £64,922.09, a £5,127.90 change. The ratios have different denominators. These generated measures do not establish concentration, account migration, contractual arrears, loss, or a cause.
+
+Within generated segments, September 30+ account proxy rates were 6.77\% for HIGHER, 3.17\% for MIDDLE, and 1.05\% for LOWER. These labels are generator-defined. The T05 memo recommends validating any similar movement in an operational portfolio against account-level balances, contractual due dates, payments, and state transitions before drawing conclusions.
+
+\section{Reporting and AI-assisted commentary}
+
+T05 produced a self-contained interactive HTML dashboard preview, a monthly review memo, a source-to-output map, and a Power BI import package with CSV sources, DAX measures, relationships, and page design. Dashboard values and the memo reconcile to T03/T04 exports. The dashboard preview's month selector and key visuals passed a JavaScript smoke check. Power BI Desktop was not available, so there is no native PBIX or Power BI render test. The project does not claim otherwise.
+
+For T06, a structured table of 28 pre-calculated metrics was supplied with definitions and source paths. The constrained prompt prohibited calculations, causal inference, outside claims, and credit actions. The preserved raw draft nevertheless inferred concentration, described synthetic proxy states as overdue/arrears, linked utilisation to the generated balance, and framed sensitivities as forecast risk. The audit removed those claims and retained only source-supported description and a real-data validation question.
+
+That independent audit also found an error in the first T05 executive summary: it said the 30+ proxy balance rose £51.3k. The SQL outputs give £64,922.09 for September and £59,794.19 for August, a £5,127.90 increase. The memo was corrected to £5.1k and a regression check was added. The corrected T05 and T06 validators pass.
+
+\section{Final quality review}
+
+The T07 final validator reruns the T02–T06 checks, confirms the synthetic source hash and required files, and verifies that the native Power BI gap is stated accurately. The final review found no other open data or narrative issue. Resume claims are deferred until overall project acceptance.
+
+Overall project acceptance remains pending one material handoff: import the Power BI-ready tables and measures into Power BI Desktop, implement the report pages from the specification, render the report, and check the figures and labels against the source-to-output map. Until this is done, the dashboard is an HTML preview, not a native Power BI report.
+
+\section{References and project evidence}
+
+Primary project evidence is in \filepath{reports/t02_validation.md}, \filepath{reports/t03_validation.md}, \filepath{reports/t04_validation.md}, and the T05/T06 report folders. Source definitions and access dates for external series are in \filepath{data/boe_source_register.csv}. Task status is in \filepath{execution.md}; critic findings and updates are in \filepath{critic.md} and \filepath{update_log.md}. Final acceptance status is in \filepath{reports/t07/final_review.md}.
+
+\newpage
+\section{Questions and answers}
+
+\subsection*{What dataset was used?}
+A generated synthetic UK credit-card portfolio created in this project: 55,145 account-month rows, 2,000 accounts, and 57 month-end periods. The separate external context consists of three Bank of England monthly series. No real customer or lender dataset was used.
+
+\subsection*{Are the 30+ measures actual arrears or default?}
+No. The generator assigns representative delinquency states and DPD values but has no dated bill or arrears ledger. The measures are synthetic state proxies only.
+
+\subsection*{What does the scenario cost represent?}
+It is an annualized mechanical sensitivity on a fixed September 2026 synthetic balance. It assumes all balance is interest-bearing and immediately repriced. It is not a prediction, actual income, customer cost, or loss estimate.
+
+\subsection*{What did the commentary audit change?}
+It removed unsupported statements about concentration, overdue exposure, causal effects, and forecast risk. It also caught a T05 typo: the 30+ proxy balance rose about £5.1k, not £51.3k.
+
+\subsection*{Is the Power BI task fully delivered?}
+Not as a native Power BI report. The interactive HTML preview, CSV inputs, DAX measures, model relationships, and page instructions exist. The remaining handoff is to import and render the report in Power BI Desktop and reconcile it to the source map.
+
+\subsection*{Can the results support a real credit decision or a performance claim?}
+No. All portfolio behavior is synthetic, segments are artificial, and the scenarios are assumptions. The artifacts demonstrate a reproducible analysis workflow, not actual lender performance or a validated policy.
+
+\end{document}

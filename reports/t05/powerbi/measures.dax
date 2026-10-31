@@ -1,0 +1,32 @@
+-- Assumes CSV money fields are retained in integer pence.
+-- These base measures are intended for a single snapshot month. For multi-month rate trends,
+-- plot the corresponding numerator/denominator ratio as a measure rather than averaging row rates.
+
+Active Balance GBP = DIVIDE(SUM(Monthly[active_balance_pence]), 100)
+
+Active Limits GBP = DIVIDE(SUM(Monthly[active_limit_pence]), 100)
+
+Active Accounts = SUM(Monthly[active_accounts])
+
+Utilisation = DIVIDE(SUM(Monthly[active_balance_pence]), SUM(Monthly[active_limit_pence]))
+
+Payment Rate = DIVIDE(SUM(Monthly[active_payment_received_pence]), SUM(Monthly[active_payment_due_pence]))
+
+Simulated 30+ Account Proxy Rate = DIVIDE(SUM(Monthly[simulated_30plus_accounts]), SUM(Monthly[active_accounts]))
+
+Simulated 30+ Balance Proxy Rate = DIVIDE(SUM(Monthly[simulated_30plus_balance_pence]), SUM(Monthly[active_balance_pence]))
+
+Simulated 30+ Proxy Balance GBP = DIVIDE(SUM(Monthly[simulated_30plus_balance_pence]), 100)
+
+Closed Final Receipts GBP = DIVIDE(SUM(Monthly[closed_final_payment_received_pence]), 100)
+
+-- Use with Context table. Stored rates are percentage points, so divide by 100 for display formatting.
+BoE Bank Rate = DIVIDE(AVERAGE(Context[boe_bank_rate_end_month_pct]), 100)
+
+BoE Quoted Card Rate = DIVIDE(AVERAGE(Context[boe_quoted_credit_card_rate_pct]), 100)
+
+BoE Effective Card Rate = DIVIDE(AVERAGE(Context[boe_effective_interest_charging_card_rate_pct]), 100)
+
+Scenario Annualized Cost Proxy GBP = SUM(Scenarios[annualized_interest_cost_proxy_gbp])
+
+Scenario Change vs Baseline GBP = SUM(Scenarios[change_vs_baseline_gbp])

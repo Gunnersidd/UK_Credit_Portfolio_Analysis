@@ -1,0 +1,4 @@
+scenario,anchor_month,active_balance_gbp,scenario_bank_rate_pct,scenario_effective_card_rate_pct,annualized_interest_cost_proxy_gbp,change_vs_baseline_gbp,balance_assumption
+Baseline,2026-09-30,2493132.48,3.75,21.71,541259.06,0.00,Sep-2026 synthetic active closing balance held constant; all of it assumed interest-bearing and repriced immediately.
+Moderate,2026-09-30,2493132.48,4.50,23.21,578656.05,37396.99,Sep-2026 synthetic active closing balance held constant; all of it assumed interest-bearing and repriced immediately.
+Severe,2026-09-30,2493132.48,5.25,24.71,616053.04,74793.98,Sep-2026 synthetic active closing balance held constant; all of it assumed interest-bearing and repriced immediately.
